@@ -1,0 +1,141 @@
+# Namespace dédié (optionnel mais recommandé)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: coursematch
+
+---
+# Déploiement PostgreSQL pour Course Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-courses
+  namespace: coursematch
+  labels:
+    app: postgres-courses
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-courses
+  template:
+    metadata:
+      labels:
+        app: postgres-courses
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: courses_db
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: kaoutarmama2025
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres  # Pour éviter les conflits
+      volumes:
+      - name: postgres-storage
+        emptyDir: {}
+
+---
+# Service PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-courses
+  namespace: coursematch
+spec:
+  selector:
+    app: postgres-courses
+  ports:
+  - port: 5432
+    targetPort: 5432
+  type: ClusterIP
+
+---
+# Déploiement Course Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: course-service
+  namespace: coursematch
+  labels:
+    app: course-service
+spec:
+  replicas: 1  # 1 seul replica pour les tests
+  selector:
+    matchLabels:
+      app: course-service
+  template:
+    metadata:
+      labels:
+        app: course-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+      - name: course-service
+        image: course-service:latest
+        imagePullPolicy: Never  # IMPORTANT : utilise l'image locale
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: docker
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:postgresql://postgres-courses:5432/courses_db
+        - name: SPRING_DATASOURCE_USERNAME
+          value: postgres
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: kaoutarmama2025
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8081
+          initialDelaySeconds: 90  # Augmenté pour le premier démarrage
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8081
+          initialDelaySeconds: 60  # Augmenté pour le premier démarrage
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+---
+# Service Course Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: course-service
+  namespace: coursematch
+  labels:
+    app: course-service
+spec:
+  selector:
+    app: course-service
+  ports:
+  - port: 8081
+    targetPort: 8081
+    name: http
+    nodePort: 30081  # Port externe pour accès depuis votre machine
+  type: NodePort  # NodePort pour test local
