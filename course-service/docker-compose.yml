@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres-courses:
+    image: postgres:15-alpine
+    container_name: postgres-courses
+    environment:
+      POSTGRES_DB: courses_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: kaoutarmama2025
+    ports:
+      - "5433:5432"  # Port 5433 sur votre machine → 5432 dans le conteneur
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - course-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Votre Course Service
+  course-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: course-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-courses:5432/courses_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: kaoutarmama2025
+    depends_on:
+      postgres-courses:
+        condition: service_healthy
+    networks:
+      - course-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  course-network:
+    driver: bridge
