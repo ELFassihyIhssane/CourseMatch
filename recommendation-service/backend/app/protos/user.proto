@@ -1,0 +1,18 @@
+syntax = "proto3";
+package user;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (User);
+}
+
+message GetUserRequest {
+  int32 user_id = 1;
+}
+
+message User {
+  int32 id = 1;
+  string name = 2;
+  repeated string interests = 3;
+  string level = 4; // fallback global (optionnel)
+  map<string, string> levels_by_interest = 5; // NEW: {"data-science":"beginner", ...}
+}

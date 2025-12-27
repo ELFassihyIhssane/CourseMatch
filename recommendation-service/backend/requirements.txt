@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+
+grpcio
+grpcio-tools
+
+SQLAlchemy>=2.0
+asyncpg
+pgvector
+
+numpy
+scikit-learn
+# torch CPU only (pas CUDA)
+torch --index-url https://download.pytorch.org/whl/cpu
+sentence-transformers
+python-dotenv
+requests

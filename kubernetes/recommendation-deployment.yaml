@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendation
+  labels:
+    app: recommendation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommendation
+  template:
+    metadata:
+      labels:
+        app: recommendation
+    spec:
+      containers:
+        - name: recommendation
+          image: recommendation-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8004
+            - containerPort: 50054
+          env:
+            - name: TOP_K_DEFAULT
+              value: "5"
+
+            # ✅ DB: tu pointes vers TON postgres K8s (service reco-postgres)
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://postgres:ihssane%402003I@reco-postgres:5432/reco_db
+
+            # ✅ si ton app.config utilise ces variables
+            - name: RECO_GRPC_PORT
+              value: "50054"
+            - name: USER_GRPC_HOST
+              value: user-service
+            - name: USER_GRPC_PORT
+              value: "50051"
+            - name: COURSE_GRPC_HOST
+              value: course-service
+            - name: COURSE_GRPC_PORT
+              value: "50052"

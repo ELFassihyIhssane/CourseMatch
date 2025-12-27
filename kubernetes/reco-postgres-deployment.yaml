@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reco-postgres
+  labels:
+    app: reco-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reco-postgres
+  template:
+    metadata:
+      labels:
+        app: reco-postgres
+    spec:
+      containers:
+        - name: reco-postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: reco_db
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: ihssane@2003I

@@ -1,0 +1,27 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: reco-postgres
+    environment:
+      POSTGRES_DB: reco_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ihssane@2003I
+    ports:
+      - "5433:5432"
+    volumes:
+      - reco_db_data:/var/lib/postgresql/data
+
+  recommendation:
+    build: .
+    container_name: recommendation
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:ihssane%402003I@db:5432/reco_db
+      TOP_K_DEFAULT: 5
+    ports:
+      - "8004:8004"
+      - "50054:50054"
+
+volumes:
+  reco_db_data:
