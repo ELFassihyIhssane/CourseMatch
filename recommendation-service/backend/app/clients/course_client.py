@@ -1,11 +1,22 @@
-import grpc
-from app.config import COURSE_GRPC_HOST, COURSE_GRPC_PORT
+import os
+import requests
+from typing import List, Dict, Any
 
-from app.protos_gen import course_pb2, course_pb2_grpc
+# Base URL du course-service (Kubernetes ou local)
+COURSE_BASE_URL = os.getenv(
+    "COURSE_BASE_URL",
+    "http://course-service:8081"  # K8s service name
+)
 
-def list_courses() -> list[course_pb2.Course]:
-    target = f"{COURSE_GRPC_HOST}:{COURSE_GRPC_PORT}"
-    with grpc.insecure_channel(target) as channel:
-        stub = course_pb2_grpc.CourseServiceStub(channel)
-        resp = stub.ListCourses(course_pb2.ListCoursesRequest(), timeout=5)
-        return list(resp.courses)
+def list_courses() -> List[Dict[str, Any]]:
+    """
+    Appelle le course-service (Spring Boot) via HTTP
+    et retourne la liste des cours (JSON).
+    """
+    url = f"{COURSE_BASE_URL}/api/courses"
+    try:
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        return resp.json()  # liste de dicts
+    except requests.RequestException as e:
+        raise RuntimeError(f"Failed to fetch courses from {url}: {e}")

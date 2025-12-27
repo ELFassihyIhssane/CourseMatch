@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: recommendation
+  namespace: coursematch
+
   labels:
     app: recommendation
 spec:
@@ -20,23 +22,20 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8004
-            - containerPort: 50054
+              name: http
           env:
             - name: TOP_K_DEFAULT
               value: "5"
 
-            # ✅ DB: tu pointes vers TON postgres K8s (service reco-postgres)
+            # ✅ DB (Postgres reco)
             - name: DATABASE_URL
               value: postgresql+asyncpg://postgres:ihssane%402003I@reco-postgres:5432/reco_db
 
-            # ✅ si ton app.config utilise ces variables
-            - name: RECO_GRPC_PORT
-              value: "50054"
-            - name: USER_GRPC_HOST
-              value: user-service
-            - name: USER_GRPC_PORT
-              value: "50051"
-            - name: COURSE_GRPC_HOST
-              value: course-service
-            - name: COURSE_GRPC_PORT
-              value: "50052"
+            # ✅ HTTP base URLs (microservices)
+            # User service (si dans default)
+            - name: USER_BASE_URL
+              value: http://user-service:8080
+
+            # Course service (chez ton ami dans namespace coursematch, port 8081)
+            - name: COURSE_BASE_URL
+              value: http://course-service:8081

@@ -3,14 +3,13 @@ from __future__ import annotations
 from typing import Iterable
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, func, text
+from sqlalchemy import select, func, text
 
 from app.embeddings import embed_text
 from app.models import CourseEmbedding, RecommendationLog, Feedback
 from app.clients.user_client import get_user
 from app.clients.course_client import list_courses
 from app.config import TOP_K_DEFAULT
-
 
 EMBED_DIM = 384
 
@@ -30,44 +29,47 @@ def _normalize_vector(vec: Iterable) -> list[float]:
     return vec
 
 
-def _course_text(c) -> str:
-    return f"{c.title}. Category: {c.category}. Level: {c.level}. {c.description or ''}"
+def _course_text(c: dict) -> str:
+    # c vient du course-service (JSON)
+    return (
+        f"{c.get('title', '')}. "
+        f"Category: {c.get('category', '')}. "
+        f"Level: {c.get('level', '')}. "
+        f"{c.get('description', '')}"
+    )
 
 
-def _build_user_profile(user) -> str:
-    interests = list(getattr(user, "interests", []) or [])
-    levels_map = dict(getattr(user, "levels_by_interest", {}) or {})
+def _build_user_profile(user: dict) -> str:
+    # user vient du user-service (JSON normalisé par user_client)
+    interests = list(user.get("interests", []) or [])
+    levels_map = dict(user.get("levels_by_interest", {}) or {})
 
     parts: list[str] = []
     for it in interests:
         lvl = levels_map.get(it)
         parts.append(f"{it} Level: {lvl}" if lvl else it)
 
-    global_level = getattr(user, "level", None)
-    if global_level:
-        parts.append(f"Global Level: {global_level}")
-
+    # ton user-service n’a pas "level" global, donc fallback:
     return " | ".join(parts) if parts else "Global Level: unknown"
 
 
-async def _ensure_course_embeddings(db: AsyncSession, courses):
-    existing = set(
-        (await db.execute(select(CourseEmbedding.course_id))).scalars().all()
-    )
+async def _ensure_course_embeddings(db: AsyncSession, courses: list[dict]):
+    existing = set((await db.execute(select(CourseEmbedding.course_id))).scalars().all())
 
     created = 0
     for c in courses:
-        if c.id in existing:
+        cid = int(c["id"])
+        if cid in existing:
             continue
 
         vec = _normalize_vector(embed_text(_course_text(c)))
 
         db.add(
             CourseEmbedding(
-                course_id=c.id,
-                category=c.category,
-                level=c.level,
-                embedding=vec,  # on laisse SQLAlchemy insert
+                course_id=cid,
+                category=c.get("category"),
+                level=c.get("level"),
+                embedding=vec,
             )
         )
         created += 1
@@ -77,26 +79,20 @@ async def _ensure_course_embeddings(db: AsyncSession, courses):
 
 
 def _vec_to_pgvector_literal(vec: list[float]) -> str:
-    """
-    Convertit list[float] vers le format attendu par pgvector côté SQL:
-    '[0.1,0.2,...]'
-    """
-    # IMPORTANT: format compact, pas de scientific notation extrême
     return "[" + ",".join(f"{x:.10f}" for x in vec) + "]"
 
 
 async def recommend(db: AsyncSession, user_id: int, top_k: int | None = None):
     top_k = top_k or TOP_K_DEFAULT
 
-    user = get_user(user_id)
-    courses = list_courses()
+    user = get_user(user_id)          # HTTP -> dict normalisé
+    courses = list_courses()          # HTTP -> list[dict]
 
     await _ensure_course_embeddings(db, courses)
 
     user_vec = _normalize_vector(embed_text(_build_user_profile(user)))
     user_vec_sql = _vec_to_pgvector_literal(user_vec)
 
-    # ✅ SQL brut: on cast explicitement en ::vector, zéro magie SQLAlchemy/pgvector
     stmt = text("""
         SELECT course_id,
                (1.0 - (embedding <=> (:user_vec)::vector)) AS sim

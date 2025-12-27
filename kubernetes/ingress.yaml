@@ -2,28 +2,31 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: coursematch-ingress
+  namespace: coursematch
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   rules:
     - host: coursematch.local
       http:
         paths:
-          - path: /api/users/?(.*)
+          - path: /api/users
             pathType: Prefix
             backend:
               service:
                 name: user-service
                 port:
-                  number: 8001
-          - path: /api/courses/?(.*)
+                  number: 8080
+
+          - path: /api/courses
             pathType: Prefix
             backend:
               service:
                 name: course-service
                 port:
-                  number: 8002
-          - path: /api/recommendations/?(.*)
+                  number: 8081
+
+          - path: /api/recommendations
             pathType: Prefix
             backend:
               service:
