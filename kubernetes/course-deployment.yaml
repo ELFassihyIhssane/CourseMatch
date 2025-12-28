@@ -38,7 +38,7 @@ spec:
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
-          subPath: postgres  # Pour éviter les conflits
+          subPath: postgres
       volumes:
       - name: postgres-storage
         emptyDir: {}
@@ -68,7 +68,7 @@ metadata:
   labels:
     app: course-service
 spec:
-  replicas: 1  # 1 seul replica pour les tests
+  replicas: 1
   selector:
     matchLabels:
       app: course-service
@@ -84,7 +84,7 @@ spec:
       containers:
       - name: course-service
         image: course-service:latest
-        imagePullPolicy: Never  # IMPORTANT : utilise l'image locale
+        imagePullPolicy: Never
         ports:
         - containerPort: 8081
           name: http
@@ -97,29 +97,34 @@ spec:
           value: postgres
         - name: SPRING_DATASOURCE_PASSWORD
           value: kaoutarmama2025
+
+        # ✅ Donne plus de RAM à Spring (souvent nécessaire sur Docker Desktop)
         resources:
           requests:
-            memory: "512Mi"
+            memory: "768Mi"
             cpu: "250m"
           limits:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "2Gi"
+            cpu: "1000m"
+
+        # ✅ Probes plus tolérantes (Spring démarre lentement)
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
             port: 8081
-          initialDelaySeconds: 90  # Augmenté pour le premier démarrage
+          initialDelaySeconds: 180
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 6
+
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness
             port: 8081
-          initialDelaySeconds: 60  # Augmenté pour le premier démarrage
+          initialDelaySeconds: 120
           periodSeconds: 5
           timeoutSeconds: 3
-          failureThreshold: 3
+          failureThreshold: 12
 
 ---
 # Service Course Service
@@ -137,5 +142,5 @@ spec:
   - port: 8081
     targetPort: 8081
     name: http
-    nodePort: 30081  # Port externe pour accès depuis votre machine
-  type: NodePort  # NodePort pour test local
+    nodePort: 30081
+  type: NodePort
