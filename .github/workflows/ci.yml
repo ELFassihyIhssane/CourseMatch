@@ -78,7 +78,7 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run recommendation-service tests
-        working-directory: recommendation-service/backend/app
+        working-directory: recommendation-service/backend
         run: |
           if [ -d tests ]; then
             pip install pytest
