@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+
+      # Crée les 2 DB nécessaires (courses_db + userdb)
+      - name: Create databases
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "CREATE DATABASE courses_db;" || true
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c "CREATE DATABASE userdb;" || true
+
+      # -------- course-service tests --------
+      - name: Test course-service
+        working-directory: course-service
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/courses_db
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          # évite d'utiliser le profil docker en CI
+          SPRING_PROFILES_ACTIVE: test
+        run: mvn -q test
+
+      # -------- user-service tests --------
+      - name: Test user-service
+        working-directory: user-service
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/userdb
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_PROFILES_ACTIVE: test
+        run: mvn -q test
+
+      # -------- python recommendation --------
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies (recommendation-service)
+        working-directory: recommendation-service/backend
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run recommendation-service tests
+        working-directory: recommendation-service/backend
+        run: |
+          if [ -d tests ]; then
+            pip install pytest
+            pytest -q
+          else
+            echo "No tests folder, skipping pytest."
+          fi
