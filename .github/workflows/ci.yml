@@ -71,14 +71,14 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
-        working-directory: recommendation-service
+      - name: Install dependencies (recommendation-service)
+        working-directory: recommendation-service/backend
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run tests (if present)
-        working-directory: recommendation-service
+      - name: Run recommendation-service tests
+        working-directory: recommendation-service/backend/app
         run: |
           if [ -d tests ]; then
             pip install pytest
